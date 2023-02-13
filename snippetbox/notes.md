@@ -1,8 +1,10 @@
 # Let's go Notes
 
-## Chapter 2.2
+## Chapter 2 - Foundations
 
-### Handlers
+### Chapter 2.2
+
+#### Handlers
 
 Handlers -> think of it as controllers in MVC pattern. They are used to implement the logic and for writing HTTP response headers and bodies.
 
@@ -12,9 +14,9 @@ http.Request -> a pointer to a struct which holds information about the current 
 
 Servemux is a router in go terminology. This stores a mapping between the URL patterns for your application and the corresponding handlers.
 
-## Chapter 2.3
+### Chapter 2.3
 
-### Fixed Path and subtree pattern
+#### Fixed Path and subtree pattern
 
 Servemux supports two types of URL pattern: _fixed paths_ and _subtree paths_. Fixed paths don't end with trailing slash, whereas subtree paths do end with trailing slash.
 
@@ -22,7 +24,7 @@ Servemux supports two types of URL pattern: _fixed paths_ and _subtree paths_. F
 
 `/` -> subtree path -> Subtree path patterns are matched (and the corresponding handler called) whenever the _start_ of a request URL path matches the subtree path. This helps explain why the "/" pattern is acting like a catch-all. The pattern essentially means match a single slash, followed by anything (or nothing at all)
 
-## The `DefaultServeMux`
+#### The `DefaultServeMux`
 
 `http.Handle` and `http.HandleFunc` function allows to register routes without declaring a servemux. Since there is a global variable `var DefaultServeMux = NewServeMux()` which is initialized by default in the `net/http` package. Since it is a global variable, any package can access it and register a route - including third party packages.
 
@@ -38,9 +40,9 @@ func main() {
 }
 ```
 
-## Chapter 2.4
+### Chapter 2.4
 
-### Customizing HTTP Headers `(look at additional information for more info)`
+#### Customizing HTTP Headers `(look at additional information for more info)`
 
 ```go
 func snippetCreateHandler(w http.ResponseWriter, r *http.Request) {
@@ -62,9 +64,9 @@ func snippetCreateHandler(w http.ResponseWriter, r *http.Request) {
 }
 ```
 
-## Chapter 2.5
+### Chapter 2.5
 
-### The `io.Writer` interface
+#### The `io.Writer` interface
 
 ```go
 func snippetViewHandler(w http.ResponseWriter, r *http.Request) {
@@ -88,7 +90,7 @@ func Fprintf(w io.Writer, format string, a ...any) (n int, err error)
 
 …but we passed it our http.ResponseWriter object instead — and it worked fine. We’re able to do this because the io.Writer type is an interface, and the http.ResponseWriter object satisfies the interface because it has a w.Write() method. [Read more about concept of interfaces](https://www.alexedwards.net/blog/interfaces-explained)
 
-## Chapter 2.6
+### Chapter 2.6
 
 **_Read once again to understand why we follow this folder structure better._**
 
@@ -170,4 +172,75 @@ func main() {
 }
 ```
 
-## Chapter 2.7
+### Chapter 2.7
+
+### Chapter 2.8
+
+### Chapter 2.9
+
+Handler is an object which satisfies the `http.Handler` interface.
+
+```go
+type Handler interface {
+	ServeHTTP(ResponseWriter, *Request)
+}
+```
+
+In simple terms, this basically means that to be a handler an object must have a ServeHTTP() method with the exact signature as above.
+
+...
+
+## Chapter 3 - Configuration and Error Handling
+
+### Main Objective
+
+- Set configuration settings for your application at runtime in an easy and idiomatic way using command-line flags.
+- Improve your application log messages to include more information, and manage them differently depending on the type (or level) of log message.
+- Make dependencies available to your handlers in a way that’s extensible, type-safe, and doesn’t get in the way when it comes to writing tests.
+- Centralize error handling so that you don’t need to repeat yourself when writing code.
+
+## Chapter 7 - Advanced Routing
+
+### router.go has to be updated.
+
+```go
+package main
+
+import (
+	"net/http"
+
+	"github.com/justinas/alice"
+)
+
+// func (app *application) routes() *http.ServeMux {
+// Update the signature for the routes() method so that it returns a
+// http.Handler instead of *http.ServeMux.
+func (app *application) routes() http.Handler {
+	mux := http.NewServeMux()
+
+	fileServer := http.FileServer(http.Dir("./ui/static"))
+	mux.Handle("/static/", http.StripPrefix("/static", fileServer))
+
+	mux.HandleFunc("/", app.homeHandler)
+	mux.HandleFunc("/snippet/view", app.snippetViewHandler)
+	mux.HandleFunc("/snippet/create", app.snippetCreateHandler)
+
+	// Pass the servemux as the 'next' parameter to the secureHeaders middleware.
+	// Because secureHeaders is just a function, and the function returns a
+	// http.Handler we don't need to do anything else.
+	// return secureHeaders(mux)
+
+	// We want the requests to be logged first, so logRequest middleware is attached to the servemux
+	// return app.recoverPanic(app.logRequest(secureHeaders(mux)))
+
+	/*  using external package to do the same above But the real power lies in the fact that you
+	can use it to create middleware chains that can be assigned to variables, appended to, and reused.
+		myChain := alice.New(myMiddlewareOne, myMiddlewareTwo)
+		myOtherChain := myChain.Append(myMiddleware3)
+		return myOtherChain.Then(myHandler)
+	*/
+	standard := alice.New(app.recoverPanic, app.logRequest, secureHeaders)
+
+	return standard.Then(mux)
+}
+```
