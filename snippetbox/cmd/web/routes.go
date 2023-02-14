@@ -24,10 +24,26 @@ func (app *application) routes() http.Handler {
 	router.Handler(http.MethodGet, "/static/*filepath", http.StripPrefix("/static", fileServer))
 	// mux.Handle("/static/", http.StripPrefix("/static", fileServer))
 
-	router.HandlerFunc(http.MethodGet, "/", app.homeHandler)
-	router.HandlerFunc(http.MethodGet, "/snippet/view/:id", app.snippetViewHandler)
-	router.HandlerFunc(http.MethodGet, "/snippet/create", app.snippetCreateHandler)
-	router.HandlerFunc(http.MethodPost, "/snippet/create", app.snippetCreatePostHandler)
+	// Use the nosurf middleware on all our 'dynamic' routes.
+	dynamic := alice.New(app.sessionManager.LoadAndSave, noSurf)
+
+	// router.HandlerFunc(http.MethodGet, "/", app.homeHandler)
+	// router.HandlerFunc(http.MethodGet, "/snippet/view/:id", app.snippetViewHandler)
+	// router.HandlerFunc(http.MethodGet, "/snippet/create", app.snippetCreateHandler)
+	// router.HandlerFunc(http.MethodPost, "/snippet/create", app.snippetCreatePostHandler)
+
+	router.Handler(http.MethodGet, "/", dynamic.ThenFunc(app.homeHandler))
+	router.Handler(http.MethodGet, "/snippet/view/:id", dynamic.ThenFunc(app.snippetViewHandler))
+	router.Handler(http.MethodGet, "/user/signup", dynamic.ThenFunc(app.userSignUpHandler))
+	router.Handler(http.MethodPost, "/user/signup", dynamic.ThenFunc(app.userSignUpPostHandler))
+	router.Handler(http.MethodGet, "/user/login", dynamic.ThenFunc(app.userLoginHandler))
+	router.Handler(http.MethodPost, "/user/login", dynamic.ThenFunc(app.userLoginPostHandler))
+
+	protected := dynamic.Append(app.requireAuthentication)
+
+	router.Handler(http.MethodGet, "/snippet/create", protected.ThenFunc(app.snippetCreateHandler))
+	router.Handler(http.MethodPost, "/snippet/create", protected.ThenFunc(app.snippetCreatePostHandler))
+	router.Handler(http.MethodPost, "/user/logout", protected.ThenFunc(app.userLogoutPostHandler))
 
 	// mux.HandleFunc("/", app.homeHandler)
 	// mux.HandleFunc("/snippet/view", app.snippetViewHandler)

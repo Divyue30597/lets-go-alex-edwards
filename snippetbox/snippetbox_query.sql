@@ -32,3 +32,22 @@ INSERT INTO snippets (title, content, created, expires) VALUES (
 SELECT * FROM snippets;
 
 -- DELETE FROM snippets WHERE id=3
+
+CREATE TABLE sessions (
+	token VARCHAR(43) PRIMARY KEY,
+	data BYTEA NOT NULL,
+	expiry TIMESTAMP NOT NULL
+)
+
+CREATE INDEX sessions_expiry_idx ON sessions (expiry);
+
+SELECT * FROM sessions
+
+CREATE TABLE users (
+	id SERIAL PRIMARY KEY NOT NULL,
+	name VARCHAR(255) NOT NULL,
+	email VARCHAR(255) UNIQUE NOT NULL,
+	hashed_password CHAR(60) NOT NULL,
+	created TIMESTAMP NOT NULL
+)
+ALTER TABLE users ADD CONSTRAINT users_uc_email UNIQUE (email);

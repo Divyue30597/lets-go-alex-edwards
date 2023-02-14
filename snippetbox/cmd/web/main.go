@@ -1,14 +1,19 @@
 package main
 
 import (
+	"crypto/tls"
 	"database/sql"
 	"flag"
 	"html/template"
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/Divyue30597/snippetbox-lets-go/internal/models"
+	"github.com/alexedwards/scs/postgresstore"
+	"github.com/alexedwards/scs/v2"
+	"github.com/go-playground/form/v4"
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
@@ -18,14 +23,18 @@ type application struct {
 	// Add a snippets field to the application struct. This will allow us to
 	// make the SnippetModel object available to our handlers.
 	snippets *models.SnippetModel
+	users    *models.UserModel
 	// initialize this cache in the main() function and make it available to our handlers as a
 	// dependency via the application struct
-	templateCache map[string]*template.Template
+	templateCache  map[string]*template.Template
+	sessionManager *scs.SessionManager
+	formDecoder    *form.Decoder
 }
 
 func main() {
 	addr := flag.String("addr", ":4000", "HTTP Network Address")
 
+	// database connection -> flag is used because we get to create cmd line flags for the user to input. Default value is already added as second param.
 	dsn := flag.String("dsn", "host=localhost port=5432 dbname=snippetbox user=postgres password=1234", "Postgresql data source name")
 
 	// Importantly, we use the flag.Parse() function to parse the command-line flag.
@@ -50,6 +59,13 @@ func main() {
 		errorLog.Fatal(err)
 	}
 
+	formDecoder := form.NewDecoder()
+
+	sessionManager := scs.New()
+	sessionManager.Store = postgresstore.New(db)
+	sessionManager.Lifetime = 12 * time.Hour
+	sessionManager.Cookie.Secure = true
+
 	// Initializing a new instance of application struct, containing the dependencies.
 	app := &application{
 		errorLog: errorLog,
@@ -58,17 +74,35 @@ func main() {
 		snippets: &models.SnippetModel{
 			DB: db,
 		},
-		templateCache: templateCache,
+		users: &models.UserModel{
+			DB: db,
+		},
+		templateCache:  templateCache,
+		sessionManager: sessionManager,
+		formDecoder:    formDecoder,
 	}
 
+	tlsConfig := &tls.Config{
+		CurvePreferences: []tls.CurveID{tls.X25519, tls.CurveP256},
+		MinVersion:       tls.VersionTLS13,
+	}
+
+	// initiating server with all the required fields.
 	srv := &http.Server{
 		Addr:     *addr,
 		ErrorLog: errorLog,
 		Handler:  app.routes(),
+		// Setting TLSConfig field
+		TLSConfig: tlsConfig,
+		// Add Idle, read and write timeouts to the server
+		IdleTimeout:  time.Minute,
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 10 * time.Second,
 	}
 
 	infoLog.Printf("Starting server on %s", *addr)
-	err = srv.ListenAndServe()
+	// err = srv.ListenAndServe()
+	err = srv.ListenAndServeTLS("./tls/cert.pem", "./tls/key.pem")
 	errorLog.Fatal(err)
 }
 

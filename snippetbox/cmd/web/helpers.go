@@ -2,10 +2,14 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"net/http"
 	"runtime/debug"
 	"time"
+
+	"github.com/go-playground/form/v4"
+	"github.com/justinas/nosurf"
 )
 
 // The serverError helper writes an error message and stack trace to the errorLog,
@@ -18,8 +22,8 @@ func (app *application) serverError(w http.ResponseWriter, err error) {
 }
 
 // The clientError helper sends a specific status code and corresponding description
-// to the user. We'll use this later in the book to send responses like 400 "Bad
-// Request" when there's a problem with the request that the user sent.
+// to the user. To send responses like 400 "Bad Request" when there's a problem with the request
+// that the user sent.
 func (app *application) clientError(w http.ResponseWriter, status int) {
 	http.Error(w, http.StatusText(status), status)
 }
@@ -62,8 +66,39 @@ func (app *application) render(w http.ResponseWriter, status int, page string, d
 	buf.WriteTo(w)
 }
 
+func (app *application) decodePostForm(r *http.Request, dst any) error {
+	err := r.ParseForm()
+	if err != nil {
+		return err
+	}
+
+	err = app.formDecoder.Decode(dst, r.PostForm)
+	if err != nil {
+		// If we try to use an invalid target destination, the Decode() method
+		// will return an error with the type *form.InvalidDecoderError.We use
+		// errors.As() to check for this and raise a panic rather than returning
+		// the error.
+		var invalidDecodeError *form.InvalidDecoderError
+
+		if errors.As(err, &invalidDecodeError) {
+			panic(err)
+		}
+
+		return err
+	}
+	return nil
+}
+
 func (app *application) newTemplateData(r *http.Request) *templateData {
 	return &templateData{
 		CurrentYear: time.Now().Year(),
+		// Add the flash message to the template data, if one exists.
+		Flash:           app.sessionManager.PopString(r.Context(), "flash"),
+		IsAuthenticated: app.isAuthenticated(r),
+		CSRFToken:       nosurf.Token(r),
 	}
+}
+
+func (app *application) isAuthenticated(r *http.Request) bool {
+	return app.sessionManager.Exists(r.Context(), "authenticateUserID")
 }

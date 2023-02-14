@@ -3,8 +3,18 @@ package main
 import (
 	"fmt"
 	"net/http"
+
+	"github.com/justinas/nosurf"
 )
 
+// Middleware flow:
+// When the last handler in the chain returns, control is passed back up the chain in the reverse direction. So when our code is being executed the flow of control actually looks like this
+// secureHeaders → servemux → application handler → servemux → secureHeaders
+
+// Current application flow
+// recoverPanic ↔ logRequest ↔ secureHeaders ↔ servemux ↔ application handler
+
+// Adding secure header to all our requests
 func secureHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Security-Policy", "default-src 'self'; style-src 'self' fonts.googleapis.com; font-src fonts.gstatic.com")
@@ -26,6 +36,7 @@ func (app *application) logRequest(next http.Handler) http.Handler {
 
 }
 
+// Recover panic is a recoverer middleware where we let the program to exit
 func (app *application) recoverPanic(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Create a deferred function (which will always be run in the event
@@ -41,4 +52,36 @@ func (app *application) recoverPanic(next http.Handler) http.Handler {
 
 		next.ServeHTTP(w, r)
 	})
+}
+
+func (app *application) requireAuthentication(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// If the user is not authenticated, redirect them to the login page and
+		// return from the middleware chain so that no subsequent handlers in
+		// the chain are executed.
+		if !app.isAuthenticated(r) {
+			http.Redirect(w, r, "/user/login", http.StatusSeeOther)
+			return
+		}
+
+		// Otherwise set the "Cache-Control: no-store" header so that pages
+		// require authentication are not stored in the users browser cache (or
+		// other intermediary cache).
+		w.Header().Add("Cache-Control", "no-store")
+
+		next.ServeHTTP(w, r)
+	})
+}
+
+// Create a NoSurf middleware function which uses a customized CSRF cookie with
+// the Secure, Path and HttpOnly attributes set.
+func noSurf(next http.Handler) http.Handler {
+	csrfHandler := nosurf.New(next)
+	csrfHandler.SetBaseCookie(http.Cookie{
+		HttpOnly: true,
+		Path:     "/",
+		Secure:   true,
+	})
+
+	return csrfHandler
 }

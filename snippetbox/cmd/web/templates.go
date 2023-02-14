@@ -10,12 +10,16 @@ import (
 
 // Define a templateData type to act as the holding structure for
 // any dynamic data that we want to pass to our HTML templates.
-// At the moment it only contains one field, but we'll add more
-// to it as the build progresses.
 type templateData struct {
 	CurrentYear int
 	Snippet     *models.Snippet
 	Snippets    []*models.Snippet
+	// adding form field with type any
+	Form  any
+	Flash string
+	// 1st, to pass this information to our HTML templates, so that we can toggle the contents of the navigation bar appropriately.
+	IsAuthenticated bool
+	CSRFToken       string
 }
 
 var functions = template.FuncMap{

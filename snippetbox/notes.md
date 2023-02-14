@@ -199,6 +199,20 @@ In simple terms, this basically means that to be a handler an object must have a
 - Make dependencies available to your handlers in a way that’s extensible, type-safe, and doesn’t get in the way when it comes to writing tests.
 - Centralize error handling so that you don’t need to repeat yourself when writing code.
 
+## Chapter - 6 Middleware
+
+### 6.2 Additional Info
+
+**Middleware flow:**
+
+When the last handler in the chain returns, control is passed back up the chain in the reverse direction. So when our code is being executed the flow of control actually looks like this
+
+`secureHeaders → servemux → application handler → servemux → secureHeaders`
+
+**Current application flow:**
+
+`recoverPanic ↔ logRequest ↔ secureHeaders ↔ servemux ↔ application handler`
+
 ## Chapter 7 - Advanced Routing
 
 ### router.go has to be updated.
