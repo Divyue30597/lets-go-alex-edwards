@@ -100,5 +100,10 @@ func (app *application) newTemplateData(r *http.Request) *templateData {
 }
 
 func (app *application) isAuthenticated(r *http.Request) bool {
-	return app.sessionManager.Exists(r.Context(), "authenticateUserID")
+	isAuthenticated, ok := r.Context().Value(isAuthenticatedContextKey).(bool)
+	if !ok {
+		return false
+	}
+	// return app.sessionManager.Exists(r.Context(), "authenticateUserID")
+	return isAuthenticated
 }

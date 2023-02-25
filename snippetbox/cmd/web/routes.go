@@ -3,6 +3,7 @@ package main
 import (
 	"net/http"
 
+	"github.com/Divyue30597/snippetbox-lets-go/ui"
 	"github.com/julienschmidt/httprouter"
 	"github.com/justinas/alice"
 )
@@ -20,12 +21,22 @@ func (app *application) routes() http.Handler {
 
 	// mux := http.NewServeMux()
 
-	fileServer := http.FileServer(http.Dir("./ui/static"))
-	router.Handler(http.MethodGet, "/static/*filepath", http.StripPrefix("/static", fileServer))
+	// fileServer := http.FileServer(http.Dir("./ui/static"))
+	// router.Handler(http.MethodGet, "/static/*filepath", http.StripPrefix("/static", fileServer))
 	// mux.Handle("/static/", http.StripPrefix("/static", fileServer))
 
+	// Using embed file systems
+	// Take the ui.Files embedded filesystem and convert it to a http.FS type so
+	// that it satisfies the http.FileSystem interface. We then pass that to the
+	// http.FileServer() function to create the file server handler.
+	fileServer := http.FileServer(http.FS(ui.Files))
+	router.Handler(http.MethodGet, "/static/*filepath", fileServer)
+
+	// Adding a new GET /ping route to help
+	router.HandlerFunc(http.MethodGet, "/ping", ping)
+
 	// Use the nosurf middleware on all our 'dynamic' routes.
-	dynamic := alice.New(app.sessionManager.LoadAndSave, noSurf)
+	dynamic := alice.New(app.sessionManager.LoadAndSave, noSurf, app.authenticate)
 
 	// router.HandlerFunc(http.MethodGet, "/", app.homeHandler)
 	// router.HandlerFunc(http.MethodGet, "/snippet/view/:id", app.snippetViewHandler)

@@ -51,3 +51,7 @@ CREATE TABLE users (
 	created TIMESTAMP NOT NULL
 )
 ALTER TABLE users ADD CONSTRAINT users_uc_email UNIQUE (email);
+
+SELECT * FROM users
+
+SELECT EXISTS(SELECT true FROM users WHERE email = 'bob@example.com')
