@@ -18,12 +18,17 @@ import (
 )
 
 type application struct {
+	// dependency injection
 	errorLog *log.Logger
 	infoLog  *log.Logger
 	// Add a snippets field to the application struct. This will allow us to
 	// make the SnippetModel object available to our handlers.
-	snippets *models.SnippetModel
-	users    *models.UserModel
+
+	// Instead of using the SnippetModel and UserModel, replace them with the interface
+	// snippets *models.SnippetModel
+	// users    *models.UserModel
+	snippets models.SnippetModelInterface
+	users    models.UserModelInterface
 	// initialize this cache in the main() function and make it available to our handlers as a
 	// dependency via the application struct
 	templateCache  map[string]*template.Template
